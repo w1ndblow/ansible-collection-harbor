@@ -1,7 +1,7 @@
 import copy
-from ansible_collections.swisstxt.harbor.plugins.module_utils.base import HarborBaseModule
+from .base import HarborBaseModule
 import json
-import requests
+# import requests
 from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = '''
@@ -18,13 +18,15 @@ options:
   configuration:
     description:
     - Dict with configuration options of Harbor.
-    - Changes to secrets, like `oidc_client_secret`, get applied without showing a change as we do not know what the value before was.
+    - Changes to secrets, like `oidc_client_secret`, get applied without \
+        showing a change as we do not know what the value before was.
     required: false
     type: dict
     default: {}
 extends_documentation_fragment:
   - swisstxt.harbor.api
 '''
+
 
 class HarborConfigModule(HarborBaseModule):
     @property
@@ -62,25 +64,28 @@ class HarborConfigModule(HarborBaseModule):
         if desired_configuration:
             after_calculated = before.copy()
             for configuration in list(desired_configuration):
-                if not configuration == "oidc_client_secret":
+                if not configuration == 'oidc_client_secret':
                     # Check if configuration option is available
                     if configuration not in before:
-                        self.module.fail_json(msg=f"Configuration option {configuration} unavailable.", **result)
+                        self.module.fail_json(
+                            msg=f'Configuration option {configuration} unavailable.',
+                            **result)
 
                     # Remove not changed configurations
-                    if desired_configuration[configuration] == before[configuration].get('value', ''):
+                    if desired_configuration[configuration] == \
+                            before[configuration].get('value', ''):
                         desired_configuration.pop(configuration)
                         continue
 
                     # Check if configuration is editable
                     if not before[configuration]['editable']:
-                        self.module.fail_json(msg=f"Configuration option {configuration} not editable.", **result)
+                        self.module.fail_json(msg=f'Configuration option {configuration} not editable.', **result)
 
                     # Create fake server response for diff
                     after_calculated.update({
                         configuration: {
-                            "value": desired_configuration[configuration],
-                            "editable": before[configuration]['editable']
+                            'value': desired_configuration[configuration],
+                            'editable': before[configuration]['editable']
                         }
                     })
 
@@ -93,8 +98,8 @@ class HarborConfigModule(HarborBaseModule):
             if self.module.check_mode:
                 result['changed'] = True
                 result['diff'] = {
-                    "before": json.dumps(before, indent=4),
-                    "after": json.dumps(after_calculated, indent=4),
+                    'before': json.dumps(before, indent=4),
+                    'after': json.dumps(after_calculated, indent=4),
                 }
 
             # Apply change without checkmode
@@ -107,11 +112,11 @@ class HarborConfigModule(HarborBaseModule):
                 if set_request.status_code == 200:
                     pass
                 elif set_request.status_code == 401:
-                    self.module.fail_json(msg="User need to log in first.", **result)
+                    self.module.fail_json(msg='User need to log in first.', **result)
                 elif set_request.status_code == 403:
-                    self.module.fail_json(msg="User does not have permission of admin role.", **result)
+                    self.module.fail_json(msg='User does not have permission of admin role.', **result)
                 elif set_request.status_code == 500:
-                    self.module.fail_json(msg="Unexpected internal errors.", **result)
+                    self.module.fail_json(msg='Unexpected internal errors.', **result)
                 else:
                     self.module.fail_json(msg=f"""
                         Unknown HTTP status code: {set_request.status_code}
@@ -128,8 +133,8 @@ class HarborConfigModule(HarborBaseModule):
                 if before != after:
                     result['changed'] = True
                     result['diff'] = {
-                        "before": json.dumps(before, indent=4),
-                        "after": json.dumps(after, indent=4),
+                        'before': json.dumps(before, indent=4),
+                        'after': json.dumps(after, indent=4),
                     }
 
         self.module.exit_json(**result)

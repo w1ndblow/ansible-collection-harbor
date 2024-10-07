@@ -73,7 +73,7 @@ class HarborProjectMemberModule(HarborBaseModule):
 
     def listProjectMembers(self, project_id):
         member_list_request = requests.get(
-            f"{self.api_url}/projects/{project_id}/members",
+            f'{self.api_url}/projects/{project_id}/members',
             auth=self.auth
         )
         member_list = member_list_request.json()
@@ -138,7 +138,7 @@ class HarborProjectMemberModule(HarborBaseModule):
         # Get Project ID
         project = self.getProjectByName(self.module.params['project'])
         if not project:
-            self.module.fail_json(msg="Project not found", **self.result)
+            self.module.fail_json(msg='Project not found', **self.result)
         project_id = project['project_id']
 
         # If no user and group is given, exit with project member list
@@ -156,13 +156,13 @@ class HarborProjectMemberModule(HarborBaseModule):
         state = self.module.params['state']
 
         # Existing member, state present, modify
-        if member and state == "present":
-            if member["role_id"] != self.role_id:
+        if member and state == 'present':
+            if member['role_id'] != self.role_id:
                 if not self.module.check_mode:
                     put_project_member_request = requests.put(
                         f"{self.api_url}/projects/{project_id}/members/{member['id']}",
                         json={
-                            "role_id": self.role_id
+                            'role_id': self.role_id
                         }
                     )
                     if not put_project_member_request.status_code == 200:
@@ -178,7 +178,7 @@ class HarborProjectMemberModule(HarborBaseModule):
                 self.result['changed'] = True
 
         # Existing member, state absent, delete
-        elif member and state == "absent":
+        elif member and state == 'absent':
             if not self.module.check_mode:
                 delete_project_member_request = requests.delete(
                     f"{self.api_url}/projects/{project_id}/members/{member['id']}",
@@ -189,27 +189,27 @@ class HarborProjectMemberModule(HarborBaseModule):
             self.result['changed'] = True
 
         # Inexistent member, state present, create
-        elif not member and state == "present":
+        elif not member and state == 'present':
             create_payload = {
-                "role_id": self.role_id,
+                'role_id': self.role_id,
             }
 
             if self.isGroup:
-                create_payload["member_group"] = {
-                    "group_name": self.module.params['group'],
-                    "group_type": self.group_type_id,
+                create_payload['member_group'] = {
+                    'group_name': self.module.params['group'],
+                    'group_type': self.group_type_id,
                 }
                 if self.module.params['ldap_group_dn'] is not None:
-                    create_payload["member_group"]["ldap_group_dn"] = self.module.params['ldap_group_dn']
+                    create_payload['member_group']['ldap_group_dn'] = self.module.params['ldap_group_dn']
 
             if self.isUser:
-                create_payload["member_user"] = {
-                    "username": self.module.params['user'],
+                create_payload['member_user'] = {
+                    'username': self.module.params['user'],
                 }
 
             if not self.module.check_mode:
                 create_project_member_request = requests.post(
-                    f"{self.api_url}/projects/{project_id}/members",
+                    f'{self.api_url}/projects/{project_id}/members',
                     auth=self.auth,
                     json=create_payload
                 )

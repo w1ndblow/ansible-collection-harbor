@@ -2,7 +2,13 @@
 # -*- coding: utf-8 -*-
 
 # (c) 2021, Joshua Hügli <@joschi36>
-# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+# GNU General Public License v3.0+ (see COPYING or \
+# https://www.gnu.org/licenses/gpl-3.0.txt)
+
+import copy
+import json
+from ansible.module_utils.basic import AnsibleModule
+from base import HarborBaseModule
 
 DOCUMENTATION = '''
 ---
@@ -19,12 +25,6 @@ extends_documentation_fragment:
   - swisstxt.harbor.api
 '''
 
-import copy
-import json
-import requests
-from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.swisstxt.harbor.plugins.module_utils.base import \
-    HarborBaseModule
 
 class HarborProjectModule(HarborBaseModule):
     @property
@@ -61,48 +61,72 @@ class HarborProjectModule(HarborBaseModule):
 
         project_desired_metadata = {}
         if self.module.params['auto_scan'] is not None:
-            project_desired_metadata['auto_scan'] = str(self.module.params['auto_scan']).lower()
+            project_desired_metadata['auto_scan'] = str(
+                self.module.params['auto_scan']).lower()
         if self.module.params['content_trust'] is not None:
-            project_desired_metadata['enable_content_trust'] = str(self.module.params['content_trust']).lower()
+            project_desired_metadata['enable_content_trust'] = str(
+                self.module.params['content_trust']).lower()
         if self.module.params['public'] is not None:
-            project_desired_metadata['public'] = str(self.module.params['public']).lower()
+            project_desired_metadata['public'] = str(
+                self.module.params['public']).lower()
 
         if existing_project:
             # Handle Quota
             if self.module.params['quota_gb'] is not None:
-                quota_request = requests.get(
-                    f"{self.api_url}/quotas?reference_id={existing_project['project_id']}",
-                    auth=self.auth
+                # quota_request = requests.get(
+                #     f"{self.api_url}/quotas?reference_id={existing_project['project_id']}",
+                #     auth=self.auth
+                # )
+                quota_request = self.make_request(
+                    f'{self.api_url}/quotas?reference_id'
+                    f"={existing_project['project_id']}",
+                    method='GET',
                 )
-                quota = quota_request.json()[0]
+                quota = quota_request['data'][0]
                 actual_quota_size = quota['hard']['storage']
-                desired_quota_size = self.quotaBits(self.module.params['quota_gb'])
+                desired_quota_size = self.quotaBits(
+                            self.module.params['quota_gb'])
                 if actual_quota_size != desired_quota_size:
-                    quota_put_request = requests.put(
+                    # quota_put_request = requests.put(
+                    #     f"{self.api_url}/quotas/{quota['id']}",
+                    #     auth=self.auth,
+                    #     json={
+                    #         'hard': {
+                    #             'storage': desired_quota_size
+                    #         }
+                    #     }
+                    # )
+                    quota_put_request = self.make_request(
                         f"{self.api_url}/quotas/{quota['id']}",
-                        auth=self.auth,
-                        json={
+                        method='PUT',
+                        data=json.dumps({
                             'hard': {
                                 'storage': desired_quota_size
-                            }
-                        }
+                             }}),
                     )
-                    if quota_put_request.status_code == 200:
+                    if quota_put_request['status'] == 200:
                         self.result['changed'] = True
-                    elif quota_put_request.status_code == 400:
-                        self.module.fail_json(msg="Illegal format of quota update request..", **self.result)
-                    elif quota_put_request.status_code == 401:
-                        self.module.fail_json(msg="User need to log in first.", **self.result)
-                    elif quota_put_request.status_code == 403:
-                        self.module.fail_json(msg="User does not have permission of admin role.", **self.result)
-                    elif quota_put_request.status_code == 500:
-                        self.module.fail_json(msg="Unexpected internal errors.", **self.result)
+                    elif quota_put_request['status'] == 400:
+                        self.module.fail_json(
+                            msg='Illegal format of quota update request..',
+                            **self.result)
+                    elif quota_put_request['status'] == 401:
+                        self.module.fail_json(
+                            msg='User need to log in first.', **self.result)
+                    elif quota_put_request['status'] == 403:
+                        self.module.fail_json(
+                            msg='User does not have permission of admin role.',
+                            **self.result)
+                    elif quota_put_request['status'] == 500:
+                        self.module.fail_json(
+                            msg='Unexpected internal errors.',
+                            **self.result)
                     else:
-                        self.module.fail_json(msg=f"""
-                            Unknown HTTP status code: {quota_put_request.status_code}
-                            Body: {quota_put_request.text}
+                        self.module.fail_json(
+                            msg=f"""
+                        Unknown HTTP status code: {quota_put_request['status']}
+                        Body: {quota_put_request.text}
                         """)
-
 
             # Check & "calculate" desired configuration
             self.result['project'] = copy.deepcopy(existing_project)
@@ -115,75 +139,82 @@ class HarborProjectModule(HarborBaseModule):
             if self.module.check_mode:
                 self.result['changed'] = True
                 self.result['diff'] = {
-                    "before": json.dumps(existing_project, indent=4),
-                    "after": json.dumps(after_calculated, indent=4),
+                    'before': json.dumps(existing_project, indent=4),
+                    'after': json.dumps(after_calculated, indent=4),
                 }
 
             else:
-                set_request = requests.put(
-                    f'{self.api_url}/projects/{existing_project["project_id"]}',
-                    auth=self.auth,
-                    json={
-                        "metadata": project_desired_metadata
+                set_request = self.make_request(
+                    f'{self.api_url}/projects'
+                    f'/{existing_project["project_id"]}',
+                    method='PUT',
+                    data={
+                        'metadata': project_desired_metadata
                     },
                 )
 
-                if not set_request.status_code == 200:
-                    self.module.fail_json(msg=self.requestParse(set_request), **self.result)
+                if not set_request['status'] == 200:
+                    self.module.fail_json(
+                        msg=self.requestParse(set_request), **self.result)
 
-                after_request =requests.get(
-                    f'{self.api_url}/projects/{existing_project["project_id"]}',
-                    auth=self.auth
+                after_request = self.make_request(
+                    f'{self.api_url}/projects/'
+                    f'{existing_project["project_id"]}',
                 )
-                after = after_request.json()
-                self.result['project'] = copy.deepcopy(after)
-                if existing_project != after:
+                self.result['project'] = copy.deepcopy(after_request)
+                if existing_project != after_request:
                     self.result['changed'] = True
                     self.result['diff'] = {
-                        "before": json.dumps(existing_project, indent=4),
-                        "after": json.dumps(after, indent=4),
+                        'before': json.dumps(existing_project, indent=4),
+                        'after': json.dumps(after_request, indent=4),
                     }
 
         else:
             if not self.module.check_mode:
                 data = {
-                    "project_name": self.module.params["name"],
-                    "metadata": project_desired_metadata,
+                    'project_name': self.module.params['name'],
+                    'metadata': project_desired_metadata,
                 }
                 if self.module.params['quota_gb'] is not None:
-                    data["storage_limit"] = self.quotaBits(self.module.params['quota_gb'])
+                    data['storage_limit'] = self.quotaBits(
+                        self.module.params['quota_gb'])
 
                 if self.module.params['cache_registry'] is not None:
-                    registry_request = requests.get(
-                        f"{self.api_url}/registries?q=name%3D{self.module.params['cache_registry']}",
-                        auth=self.auth
+                    registry_request = self.make_request(
+                        f'{self.api_url}/registries'
+                        f'?q=name%3D{self.module.params['cache_registry']}',
                     )
-
                     try:
-                        data['registry_id'] = registry_request.json()[0]['id']
+                        data['registry_id'] = registry_request[0]['id']
                     except (TypeError, ValueError):
-                        self.module.fail_json(msg="Registry not found", **self.result)
+                        self.module.fail_json(
+                            msg='Registry not found',
+                            **self.result)
 
-                create_project_request = requests.post(
+                print(data)
+                create_project_request = self.make_request(
                     self.api_url+'/projects',
-                    auth=self.auth,
-                    json=data
+                    method='POST',
+                    data=data
                 )
+                print(create_project_request)
+                if not create_project_request['status'] == 201:
+                    self.module.fail_json(msg=self.requestParse(
+                        create_project_request))
 
-                if not create_project_request.status_code == 201:
-                    self.module.fail_json(msg=self.requestParse(create_project_request))
-
-                after_request = requests.get(
-                    f"{self.api_url}/projects?page=1&page_size=1&name={self.module.params['name'] }",
-                    auth=self.auth
+                after_request = self.make_request(
+                    f'{self.api_url}/projects?page=1'
+                    f'&page_size=1&name={self.module.params['name']}'
                 )
-                self.result['project'] = copy.deepcopy(after_request.json())
+                self.result['project'] = copy.deepcopy(after_request)
             self.result['changed'] = True
 
         self.module.exit_json(**self.result)
 
+
 def main():
     HarborProjectModule()
+
 
 if __name__ == '__main__':
     main()

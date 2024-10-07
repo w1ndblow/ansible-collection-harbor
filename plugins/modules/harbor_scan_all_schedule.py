@@ -30,22 +30,22 @@ from ansible_collections.swisstxt.harbor.plugins.module_utils.base import \
 class HarborScanAllScheduleModule(HarborBaseModule):
     def getSchedule(self):
         schedule_request = requests.get(
-            f"{self.api_url}/system/scanAll/schedule",
+            f'{self.api_url}/system/scanAll/schedule',
             auth=self.auth
         )
 
-        if(schedule_request.status_code == 200 and schedule_request.headers["content-length"] == "0"):
+        if(schedule_request.status_code == 200 and schedule_request.headers['content-length'] == '0'):
             return {}
 
         schedule = schedule_request.json()
-        del schedule["schedule"]["next_scheduled_time"]
+        del schedule['schedule']['next_scheduled_time']
         return {
-            "schedule": schedule['schedule']
+            'schedule': schedule['schedule']
         }
 
     def putSchedule(self, payload):
         put_schedule_request = requests.put(
-            f"{self.api_url}/system/scanAll/schedule",
+            f'{self.api_url}/system/scanAll/schedule',
             auth=self.auth,
             json=payload
         )
@@ -54,9 +54,9 @@ class HarborScanAllScheduleModule(HarborBaseModule):
 
     def constructDesired(self, schedule_cron):
         return {
-            "schedule": {
-                "cron": schedule_cron,
-                "type": "Custom"
+            'schedule': {
+                'cron': schedule_cron,
+                'type': 'Custom'
             }
         }
 
@@ -82,7 +82,7 @@ class HarborScanAllScheduleModule(HarborBaseModule):
             changed=False
         )
 
-        desired = self.constructDesired(self.module.params["schedule_cron"])
+        desired = self.constructDesired(self.module.params['schedule_cron'])
         before = self.getSchedule()
 
         if desired != before:
@@ -90,8 +90,8 @@ class HarborScanAllScheduleModule(HarborBaseModule):
             if self.module.check_mode:
                 self.result['changed'] = True
                 self.result['diff'] = {
-                    "before": json.dumps(before, indent=4),
-                    "after": json.dumps(desired, indent=4),
+                    'before': json.dumps(before, indent=4),
+                    'after': json.dumps(desired, indent=4),
                 }
 
             # Apply change without checkmode
@@ -102,8 +102,8 @@ class HarborScanAllScheduleModule(HarborBaseModule):
 
                 self.result['changed'] = True
                 self.result['diff'] = {
-                    "before": json.dumps(before, indent=4),
-                    "after": json.dumps(after, indent=4),
+                    'before': json.dumps(before, indent=4),
+                    'after': json.dumps(after, indent=4),
                 }
 
         self.module.exit_json(**self.result)

@@ -1,0 +1,9 @@
+{
+  "ANSIBLE_MODULE_ARGS": {
+    "api_password": "Harbor12345",
+    "api_url": "http://localhost/api",
+    "api_username": "admin",
+    "name": "hello",
+    "state": "present"
+  }
+}

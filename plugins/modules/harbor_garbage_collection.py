@@ -30,26 +30,26 @@ from ansible_collections.swisstxt.harbor.plugins.module_utils.base import \
 class HarborGarbageCollectionModule(HarborBaseModule):
     def getGarbageCollection(self):
         gc_request = requests.get(
-            f"{self.api_url}/system/gc/schedule",
+            f'{self.api_url}/system/gc/schedule',
             auth=self.auth
         )
-        if(gc_request.status_code == 200 and gc_request.headers["content-length"] == "0"):
+        if(gc_request.status_code == 200 and gc_request.headers['content-length'] == '0'):
             return {}
 
         gc = gc_request.json()
-        del gc["schedule"]["next_scheduled_time"]
+        del gc['schedule']['next_scheduled_time']
         job_parameters = json.loads(gc['job_parameters'])
 
         return {
-            "parameters": {
-                "delete_untagged": job_parameters['delete_untagged']
+            'parameters': {
+                'delete_untagged': job_parameters['delete_untagged']
             },
-            "schedule": gc['schedule']
+            'schedule': gc['schedule']
         }
 
     def putGarbageCollection(self, payload):
         put_gc_request = requests.put(
-            f"{self.api_url}/system/gc/schedule",
+            f'{self.api_url}/system/gc/schedule',
             auth=self.auth,
             json=payload
         )
@@ -58,12 +58,12 @@ class HarborGarbageCollectionModule(HarborBaseModule):
 
     def constructDesired(self, delete_untagged, schedule_cron):
         return {
-            "parameters": {
-                "delete_untagged": delete_untagged
+            'parameters': {
+                'delete_untagged': delete_untagged
             },
-            "schedule": {
-                "cron": schedule_cron,
-                "type": "Custom"
+            'schedule': {
+                'cron': schedule_cron,
+                'type': 'Custom'
             }
         }
 
@@ -90,7 +90,7 @@ class HarborGarbageCollectionModule(HarborBaseModule):
             changed=False
         )
 
-        desired = self.constructDesired(self.module.params["delete_untagged"], self.module.params["schedule_cron"])
+        desired = self.constructDesired(self.module.params['delete_untagged'], self.module.params['schedule_cron'])
         before = self.getGarbageCollection()
 
         if desired != before:
@@ -98,8 +98,8 @@ class HarborGarbageCollectionModule(HarborBaseModule):
             if self.module.check_mode:
                 self.result['changed'] = True
                 self.result['diff'] = {
-                    "before": json.dumps(before, indent=4),
-                    "after": json.dumps(desired, indent=4),
+                    'before': json.dumps(before, indent=4),
+                    'after': json.dumps(desired, indent=4),
                 }
 
             # Apply change without checkmode
@@ -110,8 +110,8 @@ class HarborGarbageCollectionModule(HarborBaseModule):
 
                 self.result['changed'] = True
                 self.result['diff'] = {
-                    "before": json.dumps(before, indent=4),
-                    "after": json.dumps(after, indent=4),
+                    'before': json.dumps(before, indent=4),
+                    'after': json.dumps(after, indent=4),
                 }
 
         self.module.exit_json(**self.result)

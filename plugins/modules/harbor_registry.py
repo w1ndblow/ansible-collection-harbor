@@ -95,10 +95,10 @@ class HarborRegistryModule(HarborBaseModule):
             after_calculated.update(desired_registry)
 
             # Ignore secret as it isn't returned with API
-            after_calculated['credential'].pop("access_secret", None)
-            after_calculated.pop("update_time", None)
-            existing_registry['credential'].pop("access_secret", None)
-            existing_registry.pop("update_time", None)
+            after_calculated['credential'].pop('access_secret', None)
+            after_calculated.pop('update_time', None)
+            existing_registry['credential'].pop('access_secret', None)
+            existing_registry.pop('update_time', None)
 
             if existing_registry == after_calculated:
                 self.module.exit_json(**self.result)
@@ -106,8 +106,8 @@ class HarborRegistryModule(HarborBaseModule):
             if self.module.check_mode:
                 self.result['changed'] = True
                 self.result['diff'] = {
-                    "before": json.dumps(existing_registry, indent=4),
-                    "after": json.dumps(after_calculated, indent=4),
+                    'before': json.dumps(existing_registry, indent=4),
+                    'after': json.dumps(after_calculated, indent=4),
                 }
 
             else:
@@ -125,14 +125,14 @@ class HarborRegistryModule(HarborBaseModule):
                     auth=self.auth
                 )
                 after = after_request.json()
-                after['credential'].pop("access_secret", None)
-                after.pop("update_time", None)
+                after['credential'].pop('access_secret', None)
+                after.pop('update_time', None)
                 self.result['registry'] = copy.deepcopy(after)
                 if existing_registry != after:
                     self.result['changed'] = True
                     self.result['diff'] = {
-                        "before": json.dumps(existing_registry, indent=4),
-                        "after": json.dumps(after, indent=4),
+                        'before': json.dumps(existing_registry, indent=4),
+                        'after': json.dumps(after, indent=4),
                     }
 
         else:
