@@ -1,7 +1,6 @@
 import copy
 from base import HarborBaseModule
 import json
-# import requests
 from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = '''
@@ -120,7 +119,8 @@ class HarborConfigModule(HarborBaseModule):
                         msg='User need to log in first.', **result)
                 elif set_request['status'] == 403:
                     self.module.fail_json(
-                        msg='User does not have permission of admin role.', **result)
+                        msg='User does not have permission of admin role.',
+                        **result)
                 elif set_request['status'] == 500:
                     self.module.fail_json(
                         msg='Unexpected internal errors.', **result)
@@ -136,7 +136,6 @@ class HarborConfigModule(HarborBaseModule):
                 )
                 after = after_request['data']
                 result['configuration'] = after.copy()
-
                 if before != after:
                     result['changed'] = True
                     result['diff'] = {

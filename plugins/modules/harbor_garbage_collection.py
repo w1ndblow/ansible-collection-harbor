@@ -2,7 +2,16 @@
 # -*- coding: utf-8 -*-
 
 # (c) 2021, Joshua Hügli <@joschi36>
-# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+# GNU General Public License v3.0+
+# (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+import copy
+import json
+
+
+from ansible.module_utils.basic import AnsibleModule
+from base import \
+    HarborBaseModule
 
 DOCUMENTATION = '''
 ---
@@ -13,48 +22,50 @@ version_added: ""
 short_description: Manages Harbor garbage collection settings
 description:
   - Update Harbor garbage collection options over API.
-
+options:
+    schedule_cron:
+        description:
+        - type str
+    delete_untagged:
+        description:
+        - type bool
 extends_documentation_fragment:
   - swisstxt.harbor.api
 '''
 
-import copy
-import json
-
-import requests
-from ansible.module_utils.basic import AnsibleModule
-from base import \
-    HarborBaseModule
-
 
 class HarborGarbageCollectionModule(HarborBaseModule):
     def getGarbageCollection(self):
-        gc_request = requests.get(
+        gc_request = self.make_request(
             f'{self.api_url}/system/gc/schedule',
-            auth=self.auth
         )
-        if(gc_request.status_code == 200 and gc_request.headers['content-length'] == '0'):
+        if gc_request['status'] == 200 and \
+                gc_request['content-length'] == 0:
             return {}
-
-        gc = gc_request.json()
-        del gc['schedule']['next_scheduled_time']
-        job_parameters = json.loads(gc['job_parameters'])
-
+        gc = gc_request['data']
+        if gc.get('schedule', None):
+            del gc['schedule']['next_scheduled_time']
+        else:
+            return {}
+        if gc.get('job_parameters', None):
+            job_parameter_string = json.loads(gc['job_parameters'])
         return {
             'parameters': {
-                'delete_untagged': job_parameters['delete_untagged']
+                'delete_untagged': job_parameter_string.get(
+                    'delete_untagged')
             },
             'schedule': gc['schedule']
         }
 
     def putGarbageCollection(self, payload):
-        put_gc_request = requests.put(
+        put_gc_request = self.make_request(
             f'{self.api_url}/system/gc/schedule',
-            auth=self.auth,
-            json=payload
+            method='PUT',
+            data=payload
         )
-        if not put_gc_request.status_code == 200:
-            self.module.fail_json(msg=self.requestParse(put_gc_request))
+        if not put_gc_request['status'] == 200:
+            self.module.fail_json(
+                msg=self.requestParse(put_gc_request))
 
     def constructDesired(self, delete_untagged, schedule_cron):
         return {
@@ -66,7 +77,6 @@ class HarborGarbageCollectionModule(HarborBaseModule):
                 'type': 'Custom'
             }
         }
-
 
     @property
     def argspec(self):
@@ -90,7 +100,8 @@ class HarborGarbageCollectionModule(HarborBaseModule):
             changed=False
         )
 
-        desired = self.constructDesired(self.module.params['delete_untagged'], self.module.params['schedule_cron'])
+        desired = self.constructDesired(self.module.params['delete_untagged'],
+                                        self.module.params['schedule_cron'])
         before = self.getGarbageCollection()
 
         if desired != before:

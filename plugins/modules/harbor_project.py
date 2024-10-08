@@ -73,10 +73,6 @@ class HarborProjectModule(HarborBaseModule):
         if existing_project:
             # Handle Quota
             if self.module.params['quota_gb'] is not None:
-                # quota_request = requests.get(
-                #     f"{self.api_url}/quotas?reference_id={existing_project['project_id']}",
-                #     auth=self.auth
-                # )
                 quota_request = self.make_request(
                     f'{self.api_url}/quotas?reference_id'
                     f"={existing_project['project_id']}",
@@ -87,15 +83,6 @@ class HarborProjectModule(HarborBaseModule):
                 desired_quota_size = self.quotaBits(
                             self.module.params['quota_gb'])
                 if actual_quota_size != desired_quota_size:
-                    # quota_put_request = requests.put(
-                    #     f"{self.api_url}/quotas/{quota['id']}",
-                    #     auth=self.auth,
-                    #     json={
-                    #         'hard': {
-                    #             'storage': desired_quota_size
-                    #         }
-                    #     }
-                    # )
                     quota_put_request = self.make_request(
                         f"{self.api_url}/quotas/{quota['id']}",
                         method='PUT',
