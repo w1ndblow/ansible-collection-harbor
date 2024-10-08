@@ -3,6 +3,10 @@
 
 # (c) 2021, Joshua Hügli <@joschi36>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+import copy
+from ansible.module_utils.basic import AnsibleModule
+from base import \
+    HarborBaseModule
 
 DOCUMENTATION = '''
 ---
@@ -18,12 +22,6 @@ options:
 extends_documentation_fragment:
   - swisstxt.harbor.api
 '''
-
-import copy
-import requests
-from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.swisstxt.harbor.plugins.module_utils.base import \
-    HarborBaseModule
 
 
 class HarborProjectMemberModule(HarborBaseModule):
@@ -72,18 +70,18 @@ class HarborProjectMemberModule(HarborBaseModule):
             return self.module.params['group']
 
     def listProjectMembers(self, project_id):
-        member_list_request = requests.get(
+        member_list_request = self.make_request(
             f'{self.api_url}/projects/{project_id}/members',
-            auth=self.auth
         )
-        member_list = member_list_request.json()
+        member_list = member_list_request['data']
         self.result['member_list'] = member_list
         return member_list
 
     def getMember(self, project_id, member_name, member_type):
         member_list = self.listProjectMembers(project_id)
         for member in member_list:
-            if member['entity_type'] == member_type and member['entity_name'] == member_name:
+            if member['entity_type'] == member_type and member['entity_name'] \
+                    == member_name:
                 self.result['member'] = copy.deepcopy(member)
                 return member
 
@@ -105,13 +103,17 @@ class HarborProjectMemberModule(HarborBaseModule):
             role=dict(
                 type='str',
                 required=False,
-                choices=['projectAdmin', 'maintainer', 'developer', 'guest', 'limitedGuest']
+                choices=[
+                    'projectAdmin',
+                    'maintainer',
+                    'developer',
+                    'guest',
+                    'limitedGuest']
             ),
 
             state=dict(default='present', choices=['present', 'absent'])
         )
         return argument_spec
-
 
     def __init__(self):
         self.module = AnsibleModule(
@@ -159,14 +161,17 @@ class HarborProjectMemberModule(HarborBaseModule):
         if member and state == 'present':
             if member['role_id'] != self.role_id:
                 if not self.module.check_mode:
-                    put_project_member_request = requests.put(
-                        f"{self.api_url}/projects/{project_id}/members/{member['id']}",
-                        json={
+                    put_project_member_request = self.make_request(
+                        f"{self.api_url}/projects/{project_id}"
+                        f"/members/{member['id']}",
+                        method='PUT',
+                        data={
                             'role_id': self.role_id
                         }
                     )
-                    if not put_project_member_request.status_code == 200:
-                        self.module.fail_json(msg=self.requestParse(put_project_member_request))
+                    if not put_project_member_request['status'] == 200:
+                        self.module.fail_json(msg=self.requestParse(
+                            put_project_member_request))
 
                     # Execute getMember to set results
                     self.getMember(
@@ -180,11 +185,14 @@ class HarborProjectMemberModule(HarborBaseModule):
         # Existing member, state absent, delete
         elif member and state == 'absent':
             if not self.module.check_mode:
-                delete_project_member_request = requests.delete(
-                    f"{self.api_url}/projects/{project_id}/members/{member['id']}",
+                delete_project_member_request = self.make_request(
+                    f"{self.api_url}/projects/{project_id}"
+                    f"/members/{member['id']}",
+                    method='DELETE'
                 )
-                if not delete_project_member_request.status_code == 200:
-                    self.module.fail_json(msg=self.requestParse(delete_project_member_request))
+                if not delete_project_member_request['status'] == 200:
+                    self.module.fail_json(
+                        msg=self.requestParse(delete_project_member_request))
 
             self.result['changed'] = True
 
@@ -200,22 +208,24 @@ class HarborProjectMemberModule(HarborBaseModule):
                     'group_type': self.group_type_id,
                 }
                 if self.module.params['ldap_group_dn'] is not None:
-                    create_payload['member_group']['ldap_group_dn'] = self.module.params['ldap_group_dn']
+                    create_payload['member_group']['ldap_group_dn'] = \
+                        self.module.params['ldap_group_dn']
 
             if self.isUser:
                 create_payload['member_user'] = {
                     'username': self.module.params['user'],
                 }
-
+            print(create_payload)
             if not self.module.check_mode:
-                create_project_member_request = requests.post(
+                create_project_member_request = self.make_request(
                     f'{self.api_url}/projects/{project_id}/members',
-                    auth=self.auth,
-                    json=create_payload
+                    method='POST',
+                    data=create_payload
                 )
 
-                if not create_project_member_request.status_code == 201:
-                    self.module.fail_json(msg=self.requestParse(create_project_member_request))
+                if not create_project_member_request['status'] == 201:
+                    self.module.fail_json(msg=self.requestParse(
+                        create_project_member_request))
 
                 # Execute getMember to set results
                 self.getMember(
@@ -230,12 +240,12 @@ class HarborProjectMemberModule(HarborBaseModule):
         else:
             pass
 
-
         self.module.exit_json(**self.result)
 
 
 def main():
     HarborProjectMemberModule()
+
 
 if __name__ == '__main__':
     main()
