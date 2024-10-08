@@ -23,7 +23,7 @@ import json
 
 import requests
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.swisstxt.harbor.plugins.module_utils.base import \
+from base import \
     HarborBaseModule
 
 
@@ -117,9 +117,9 @@ class HarborGarbageCollectionModule(HarborBaseModule):
         self.module.exit_json(**self.result)
 
 
-
 def main():
     HarborGarbageCollectionModule()
+
 
 if __name__ == '__main__':
     main()

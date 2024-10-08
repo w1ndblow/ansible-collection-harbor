@@ -1,5 +1,5 @@
 import copy
-from .base import HarborBaseModule
+from base import HarborBaseModule
 import json
 # import requests
 from ansible.module_utils.basic import AnsibleModule
@@ -52,11 +52,10 @@ class HarborConfigModule(HarborBaseModule):
         )
 
         # Get existing configuration
-        before_request = requests.get(
+        before_request = self.make_request(
             self.api_url+'/configurations',
-            auth=self.auth
         )
-        before = before_request.json()
+        before = before_request['data']
         result['configuration'] = before.copy()
 
         # Check & "calculate" desired configuration
@@ -68,7 +67,8 @@ class HarborConfigModule(HarborBaseModule):
                     # Check if configuration option is available
                     if configuration not in before:
                         self.module.fail_json(
-                            msg=f'Configuration option {configuration} unavailable.',
+                            msg=f'Configuration option {configuration}'
+                                f' unavailable.',
                             **result)
 
                     # Remove not changed configurations
@@ -79,7 +79,10 @@ class HarborConfigModule(HarborBaseModule):
 
                     # Check if configuration is editable
                     if not before[configuration]['editable']:
-                        self.module.fail_json(msg=f'Configuration option {configuration} not editable.', **result)
+                        self.module.fail_json(
+                            msg=f'Configuration option'
+                                f'{configuration} not editable.',
+                                **result)
 
                     # Create fake server response for diff
                     after_calculated.update({
@@ -90,7 +93,8 @@ class HarborConfigModule(HarborBaseModule):
                     })
 
             result['desired_configuration'] = desired_configuration
-            if (not self.module.params['force']) and before == after_calculated:
+            if (not self.module.params['force']) and before == \
+                    after_calculated:
                 result['changed'] = False
                 self.module.exit_json(**result)
 
@@ -104,30 +108,33 @@ class HarborConfigModule(HarborBaseModule):
 
             # Apply change without checkmode
             else:
-                set_request = requests.put(
+                set_request = self.make_request(
                     self.api_url+'/configurations',
-                    auth=self.auth,
-                    json=desired_configuration,
+                    method='PUT',
+                    data=desired_configuration,
                 )
-                if set_request.status_code == 200:
+                if set_request['status'] == 200:
                     pass
-                elif set_request.status_code == 401:
-                    self.module.fail_json(msg='User need to log in first.', **result)
-                elif set_request.status_code == 403:
-                    self.module.fail_json(msg='User does not have permission of admin role.', **result)
-                elif set_request.status_code == 500:
-                    self.module.fail_json(msg='Unexpected internal errors.', **result)
+                elif set_request['status'] == 401:
+                    self.module.fail_json(
+                        msg='User need to log in first.', **result)
+                elif set_request['status'] == 403:
+                    self.module.fail_json(
+                        msg='User does not have permission of admin role.', **result)
+                elif set_request['status'] == 500:
+                    self.module.fail_json(
+                        msg='Unexpected internal errors.', **result)
                 else:
-                    self.module.fail_json(msg=f"""
-                        Unknown HTTP status code: {set_request.status_code}
-                        Body: {set_request.text}
+                    self.module.fail_json(
+                        msg=f"""
+                        Unknown HTTP status code: {set_request['status']}
+                        Body: {set_request['data']}
                     """)
 
-                after_request = requests.get(
+                after_request = self.make_request(
                     self.api_url+'/configurations',
-                    auth=self.auth
                 )
-                after = after_request.json()
+                after = after_request['data']
                 result['configuration'] = after.copy()
 
                 if before != after:
@@ -139,8 +146,10 @@ class HarborConfigModule(HarborBaseModule):
 
         self.module.exit_json(**result)
 
+
 def main():
     HarborConfigModule()
+
 
 if __name__ == '__main__':
     main()
