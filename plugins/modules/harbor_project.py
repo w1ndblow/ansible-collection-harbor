@@ -41,7 +41,9 @@ class HarborProjectModule(HarborBaseModule):
 
             cache_registry=dict(type='str', required=False),
 
-            state=dict(default='present', choices=['present'])
+            state=dict(default='present', choices=[
+                'present',
+                'absent'])
         )
         return argument_spec
 
@@ -58,6 +60,20 @@ class HarborProjectModule(HarborBaseModule):
         )
 
         existing_project = self.getProjectByName(self.module.params['name'])
+        module_state = self.module.params['state']
+
+        if existing_project and module_state == 'absent' and not \
+                self.module.check_mode:
+            del_request = self.make_request(
+                    f'{self.api_url}/projects'
+                    f'/{existing_project["project_id"]}',
+                    method='DELETE')
+            if del_request['status'] == 200:
+                self.result['changed'] = True
+                self.module.exit_json(**self.result)
+            else:
+                self.module.fail_json(msg=self.requestParse(
+                        del_request))
 
         project_desired_metadata = {}
         if self.module.params['auto_scan'] is not None:
@@ -178,13 +194,11 @@ class HarborProjectModule(HarborBaseModule):
                             msg='Registry not found',
                             **self.result)
 
-                print(data)
                 create_project_request = self.make_request(
                     self.api_url+'/projects',
                     method='POST',
                     data=data
                 )
-                print(create_project_request)
                 if not create_project_request['status'] == 201:
                     self.module.fail_json(msg=self.requestParse(
                         create_project_request))

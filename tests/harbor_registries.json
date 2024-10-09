@@ -1,0 +1,11 @@
+{
+    "ANSIBLE_MODULE_ARGS": {
+      "api_password": "Harbor12345",
+      "api_url": "http://localhost:8080/api/v2.0",
+      "api_username": "admin",
+      "type": "gitlab",
+      "name": "hello",
+      "endpoint_url": "http://registry.gitlab.com",
+      "state": "present"
+    }
+}

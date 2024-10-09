@@ -2,7 +2,14 @@
 # -*- coding: utf-8 -*-
 
 # (c) 2021, Joshua Hügli <@joschi36>
-# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+# GNU General Public License v3.0+ (see COPYING or \
+# https://www.gnu.org/licenses/gpl-3.0.txt)
+
+import copy
+import json
+from ansible.module_utils.basic import AnsibleModule
+from base import \
+    HarborBaseModule
 
 DOCUMENTATION = '''
 ---
@@ -19,13 +26,6 @@ extends_documentation_fragment:
   - swisstxt.harbor.api
 '''
 
-import copy
-import json
-import requests
-from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.swisstxt.harbor.plugins.module_utils.base import \
-    HarborBaseModule
-
 
 class HarborRegistryModule(HarborBaseModule):
     @property
@@ -35,25 +35,42 @@ class HarborRegistryModule(HarborBaseModule):
             name=dict(type='str', required=True),
             type=dict(
                 type='str',
-                required=True,
-                choices=['ali-acr', 'aws-ecr', 'azure-acr', 'docker-hub',
-                'docker-registry', 'gitlab', 'google-gcr', 'harbor',
-                'helm-hub', 'huawei-SWR', 'jfrog-artifactory', 'quay',
-                'tencent-tcr', ]
+                required=False,
+                choices=[
+                    'ali-acr',
+                    'aws-ecr',
+                    'azure-acr',
+                    'docker-hub',
+                    'docker-registry',
+                    'gitlab',
+                    'google-gcr',
+                    'harbor',
+                    'helm-hub',
+                    'huawei-SWR',
+                    'jfrog-artifactory',
+                    'quay',
+                    'tencent-tcr',
+                    ]
             ),
-            endpoint_url=dict(type='str', required=True),
+            endpoint_url=dict(type='str', required=False),
             access_key=dict(type='str', required=False),
             access_secret=dict(type='str', required=False, no_log=True),
             insecure=dict(type='bool', required=False),
 
-            state=dict(default='present', choices=['present'])
+            state=dict(default='present', choices=[
+                'present',
+                'absent'])
         )
         return argument_spec
 
     def __init__(self):
         self.module = AnsibleModule(
             argument_spec=self.argspec,
-            supports_check_mode=True
+            supports_check_mode=True,
+            required_if=[
+                ('state', 'present', ('type',
+                                      'endpoint_url'))
+            ],
         )
 
         super().__init__()
@@ -62,12 +79,25 @@ class HarborRegistryModule(HarborBaseModule):
             changed=False
         )
 
-        existing_registry_request = requests.get(
+        existing_registry_request = self.make_request(
             f"{self.api_url}/registries?q=name%3D{self.module.params['name']}",
-            auth=self.auth
         )
 
-        existing_registry = existing_registry_request.json()
+        existing_registry = existing_registry_request['data']
+        module_state = self.module.params['state']
+
+        if existing_registry and module_state == 'absent':
+            existing_registry = existing_registry[0]
+            del_request = self.make_request(
+                f'{self.api_url}/registries/{existing_registry["id"]}',
+                method='DELETE',
+                )
+            if del_request['status'] == 200:
+                self.result['changed'] = True
+                self.module.exit_json(**self.result)
+            else:
+                self.module.fail_json(msg=self.requestParse(
+                        del_request))
 
         desired_registry = {
             'name': self.module.params['name'],
@@ -80,10 +110,12 @@ class HarborRegistryModule(HarborBaseModule):
         if self.module.params['endpoint_url'] is not None:
             desired_registry['url'] = self.module.params['endpoint_url']
         if self.module.params['access_key'] is not None:
-            desired_registry['credential']['access_key'] = self.module.params['access_key']
+            desired_registry['credential']['access_key'] = self.module.params[
+                'access_key']
             desired_registry['credential']['type'] = 'basic'
         if self.module.params['access_secret'] is not None:
-            desired_registry['credential']['access_secret'] = self.module.params['access_secret']
+            desired_registry['credential']['access_secret'] = \
+                self.module.params['access_secret']
             desired_registry['credential']['type'] = 'basic'
 
         if existing_registry:
@@ -111,20 +143,19 @@ class HarborRegistryModule(HarborBaseModule):
                 }
 
             else:
-                set_request = requests.put(
+                set_request = self.make_request(
                     f'{self.api_url}/registries/{existing_registry["id"]}',
-                    auth=self.auth,
-                    json=desired_registry,
+                    method='PUT',
+                    data=desired_registry,
                 )
 
-                if not set_request.status_code == 200:
+                if not set_request['status'] == 200:
                     self.module.fail_json(msg=self.requestParse(set_request))
 
-                after_request =requests.get(
+                after_request = self.make_request(
                     f'{self.api_url}/registries/{existing_registry["id"]}',
-                    auth=self.auth
                 )
-                after = after_request.json()
+                after = after_request['data']
                 after['credential'].pop('access_secret', None)
                 after.pop('update_time', None)
                 self.result['registry'] = copy.deepcopy(after)
@@ -137,26 +168,30 @@ class HarborRegistryModule(HarborBaseModule):
 
         else:
             if not self.module.check_mode:
-                create_project_request = requests.post(
+                print(desired_registry)
+                create_project_request = self.make_request(
                     self.api_url+'/registries',
-                    auth=self.auth,
-                    json=desired_registry
+                    method='POST',
+                    data=desired_registry
                 )
-                if not create_project_request.status_code == 201:
-                    self.module.fail_json(msg=self.requestParse(create_project_request))
+                if not create_project_request['status'] == 201:
+                    self.module.fail_json(msg=self.requestParse(
+                        create_project_request))
 
-                after_request =requests.get(
-                    f"{self.api_url}/registries?q=name%3D{self.module.params['name']}",
-                    auth=self.auth
+                after_request = self.make_request(
+                    f"{self.api_url}/registries?q=name%3D{self.module.params[
+                        'name']}",
                 )
-                self.result['registry'] = copy.deepcopy(after_request.json())
+                self.result['registry'] = copy.deepcopy(after_request['data'])
 
             self.result['changed'] = True
 
         self.module.exit_json(**self.result)
 
+
 def main():
     HarborRegistryModule()
+
 
 if __name__ == '__main__':
     main()

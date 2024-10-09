@@ -105,5 +105,5 @@ class HarborBaseModule(object):
             message = \
                 'Unknown Response\n' \
                 f"HTTP status code: {request['status']}\n" \
-                f"Body: {request['status']}"
+                f"Body: {request['data']}"
         return message
