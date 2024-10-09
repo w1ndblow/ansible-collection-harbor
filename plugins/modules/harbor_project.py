@@ -7,7 +7,7 @@
 #import sys; sys.path.append('../..')
 import copy
 import json
-from ansible.module_utils.harbor_base import *
+from ansible.module_utils import harbor_base
 from ansible.module_utils.basic import AnsibleModule
 
 
@@ -27,7 +27,7 @@ extends_documentation_fragment:
 '''
 
 
-class HarborProjectModule(HarborBaseModule):
+class HarborProjectModule(harbor_base.HarborBaseModule):
     @property
     def argspec(self):
         argument_spec = copy.deepcopy(self.COMMON_ARG_SPEC)
