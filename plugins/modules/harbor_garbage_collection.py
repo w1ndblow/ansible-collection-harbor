@@ -10,8 +10,7 @@ import json
 
 
 from ansible.module_utils.basic import AnsibleModule
-from module_utils.harbor_base import \
-    HarborBaseModule
+from ansible_collections.swisstxt.harbor.plugins.module_utils.harbor_base import HarborBaseModule
 
 DOCUMENTATION = '''
 ---

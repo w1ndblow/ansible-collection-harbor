@@ -4,7 +4,6 @@
 # (c) 2021, Joshua Hügli <@joschi36>
 # GNU General Public License v3.0+ (see COPYING or \
 # https://www.gnu.org/licenses/gpl-3.0.txt)
-#import sys; sys.path.append('../..')
 import copy
 import json
 from ansible_collections.swisstxt.harbor.plugins.module_utils.harbor_base import HarborBaseModule
