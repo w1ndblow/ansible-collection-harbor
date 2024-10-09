@@ -105,3 +105,7 @@ class HarborBaseModule(object):
                 f"HTTP status code: {request['status']}\n" \
                 f"Body: {request['data']}"
         return message
+
+
+if __name__ == '__main__':
+    pass

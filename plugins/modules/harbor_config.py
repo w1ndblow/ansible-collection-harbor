@@ -1,6 +1,6 @@
 #import sys; sys.path.append('../..')
 import copy
-from module_utils.harbor_base import HarborBaseModule
+from ansible.module_utils.harbor_base import HarborBaseModule
 import json
 from ansible.module_utils.basic import AnsibleModule
 
