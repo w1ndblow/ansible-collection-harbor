@@ -1,3 +1,4 @@
+import sys; sys.path.append('../..')
 import copy
 from plugins.module_utils.harbor_base import HarborBaseModule
 import json
