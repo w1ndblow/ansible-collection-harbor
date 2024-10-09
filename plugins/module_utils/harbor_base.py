@@ -3,7 +3,7 @@ import json
 import base64
 from ansible.module_utils.urls import fetch_url
 
-__metaclass__ = type
+# __metaclass__ = type
 
 
 class HarborBaseModule(object):
