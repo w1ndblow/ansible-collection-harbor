@@ -8,7 +8,7 @@ import sys; sys.path.append('../..')
 import copy
 import json
 from ansible.module_utils.basic import AnsibleModule
-from plugins.module_utils.harbor_base import HarborBaseModule
+from ansible.module_utils.harbor_base import HarborBaseModule
 
 DOCUMENTATION = '''
 ---
