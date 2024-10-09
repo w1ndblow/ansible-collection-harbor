@@ -9,5 +9,4 @@
         files:
           - harbor_project.json
 
-
 # "{{ ansible_facts['ANSIBLE_MODULE_ARGS'] }}"
