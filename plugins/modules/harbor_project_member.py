@@ -216,7 +216,6 @@ class HarborProjectMemberModule(HarborBaseModule):
                 create_payload['member_user'] = {
                     'username': self.module.params['user'],
                 }
-            print(create_payload)
             if not self.module.check_mode:
                 create_project_member_request = self.make_request(
                     f'{self.api_url}/projects/{project_id}/members',

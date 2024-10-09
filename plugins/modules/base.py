@@ -48,14 +48,12 @@ class HarborBaseModule(object):
                         headers=headers,
                         data=json.dumps(data)
                             )
-            print(resp, info)
             string_byte = resp.read()
             if string_byte:
                 response['data'] = json.loads(string_byte.decode('utf-8'))
             response['status'] = info['status']
             response['errors'] = info.get('body', None)
             response['content-length'] = int(info.get('content-length', 0))
-            print(response)
         except json.JSONDecodeError:
             self.module.fail_json(
                 msg=f"""

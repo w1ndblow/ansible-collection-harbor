@@ -168,7 +168,6 @@ class HarborRegistryModule(HarborBaseModule):
 
         else:
             if not self.module.check_mode:
-                print(desired_registry)
                 create_project_request = self.make_request(
                     self.api_url+'/registries',
                     method='POST',
