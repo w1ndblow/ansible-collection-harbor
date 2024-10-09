@@ -6,7 +6,7 @@
 # https://www.gnu.org/licenses/gpl-3.0.txt)
 import copy
 from ansible.module_utils.basic import AnsibleModule
-from plugins.module_utils.harbor_base import \
+from module_utils.harbor_base import \
     HarborBaseModule
 
 DOCUMENTATION = '''
