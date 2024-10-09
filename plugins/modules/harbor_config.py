@@ -1,5 +1,5 @@
 import copy
-from base import HarborBaseModule
+from plugins.modules.harbor_base import HarborBaseModule
 import json
 from ansible.module_utils.basic import AnsibleModule
 

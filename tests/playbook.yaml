@@ -1,0 +1,13 @@
+---
+- name: test ansible module
+  hosts: localhost
+  tasks:
+    - name: Create project
+      swisstxt.harbor.harbor_project:
+      vars:
+        params:
+        files:
+          - harbor_project.json
+
+
+# "{{ ansible_facts['ANSIBLE_MODULE_ARGS'] }}"

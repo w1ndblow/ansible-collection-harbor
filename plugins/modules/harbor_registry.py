@@ -8,7 +8,7 @@
 import copy
 import json
 from ansible.module_utils.basic import AnsibleModule
-from base import \
+from plugins.modules.harbor_base import \
     HarborBaseModule
 
 DOCUMENTATION = '''
