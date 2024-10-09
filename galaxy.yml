@@ -1,7 +1,7 @@
 # See https://docs.ansible.com/ansible/latest/dev_guide/collections_galaxy_meta.html
 
-namespace: harbor
-#name: harbor
+namespace: swisstxt 
+name: harbor
 version: 0.3.0
 readme: README.md
 authors:
