@@ -4,9 +4,8 @@
   tasks:
     - name: Create project
       swisstxt.harbor.harbor_project:
-      vars:
-        params:
-        files:
-          - harbor_project.json
-
-# "{{ ansible_facts['ANSIBLE_MODULE_ARGS'] }}"
+        api_password: Harbor12345
+        api_url: http://localhost:8080/api/v2.0
+        api_username: admin
+        name: hello
+        state: present
