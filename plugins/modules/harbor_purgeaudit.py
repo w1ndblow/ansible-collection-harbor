@@ -4,39 +4,84 @@
 # (c) 2021, Joshua Hügli <@joschi36>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-DOCUMENTATION = '''
+from __future__ import (absolute_import, division, print_function)
+__metaclass__ = type
+
+
+DOCUMENTATION = r'''
 ---
 module: harbor_purgeaudit
 author:
   - Joshua Hügli (@joschi36)
-version_added: ""
+version_added: 0.1.0
 short_description: Manages Harbor purge audit settings
 description:
   - Update Harbor purge audit options over API.
-
+options:
+  schedule_cron:
+    description:
+    - Standard cron string.
+    type: str
+    required: true
+  audit_retention_hour:
+    description:
+    - Number of hours to retain audit logs.
+    type: int
+    required: true
+  included_operations:
+    description:
+    - Operations to include in the purge.
+    type: list
+    elements: str
+    required: true
+    choices:
+    - create
+    - delete
+    - pull
+  state:
+    description:
+    - Desired state of the purge audit settings.
+    - Only V(present) is supported.
+    type: str
+    required: false
+    default: present
+    choices:
+    - present
 extends_documentation_fragment:
-  - swisstxt.harbor.api
+  - w1ndblow.harbor.api
+'''
+
+EXAMPLES = r'''
+- name: Configure Harbor purge audit schedule
+  w1ndblow.harbor.harbor_purgeaudit:
+    api_url: https://localhost/api/v2.0
+    api_username: admin
+    api_password: Harbor12345
+    schedule_cron: "0 0 0 * * *"
+    audit_retention_hour: 168
+    included_operations:
+    - create
+    - delete
+    - pull
 '''
 
 import copy
 import json
 
-import requests
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.swisstxt.harbor.plugins.module_utils.base import \
-    HarborBaseModule
+from ansible_collections.w1ndblow.harbor.plugins.module_utils.harbor_base import HarborBaseModule
 
 
 class HarborPurgeAuditModule(HarborBaseModule):
     def getPurgeAudit(self):
-        purgeaudit_request = requests.get(
+        purgeaudit_request = self.make_request(
             f'{self.api_url}/system/purgeaudit/schedule',
-            auth=self.auth
         )
-        if(purgeaudit_request.status_code == 200 and purgeaudit_request.headers['content-length'] == '0'):
+        if purgeaudit_request['status'] == 200 and \
+                purgeaudit_request['content-length'] == 0:
             return {}
 
-        purgeaudit = purgeaudit_request.json()
+        purgeaudit = purgeaudit_request['data']
         del purgeaudit['schedule']['next_scheduled_time']
         job_parameters = json.loads(purgeaudit['job_parameters'])
 
@@ -50,15 +95,17 @@ class HarborPurgeAuditModule(HarborBaseModule):
         }
 
     def putPurgeAudit(self, payload):
-        put_purgeaudit_request = requests.put(
+        put_purgeaudit_request = self.make_request(
             f'{self.api_url}/system/purgeaudit/schedule',
-            auth=self.auth,
-            json=payload
+            method='PUT',
+            data=payload
         )
-        if not put_purgeaudit_request.status_code == 200:
-            self.module.fail_json(msg=self.requestParse(put_purgeaudit_request))
+        if not put_purgeaudit_request['status'] == 200:
+            self.module.fail_json(
+                msg=self.requestParse(put_purgeaudit_request))
 
-    def constructDesired(self, audit_retention_hour, include_operations, schedule_cron):
+    def constructDesired(self, audit_retention_hour, include_operations,
+                         schedule_cron):
         return {
             'parameters': {
                 'audit_retention_hour': audit_retention_hour,
@@ -71,14 +118,17 @@ class HarborPurgeAuditModule(HarborBaseModule):
             }
         }
 
-
     @property
     def argspec(self):
         argument_spec = copy.deepcopy(self.COMMON_ARG_SPEC)
         argument_spec.update(
             schedule_cron=dict(type='str', required=True),
             audit_retention_hour=dict(type='int', required=True),
-            included_operations=dict(type='list', required=True, choices=['create', 'delete', 'pull']),
+            included_operations=dict(
+                type='list',
+                elements='str',
+                required=True,
+                choices=['create', 'delete', 'pull']),
             state=dict(default='present', choices=['present'])
         )
         return argument_spec
@@ -95,7 +145,10 @@ class HarborPurgeAuditModule(HarborBaseModule):
             changed=False
         )
 
-        desired = self.constructDesired(self.module.params['audit_retention_hour'], self.module.params['included_operations'], self.module.params['schedule_cron'])
+        desired = self.constructDesired(
+            self.module.params['audit_retention_hour'],
+            self.module.params['included_operations'],
+            self.module.params['schedule_cron'])
         before = self.getPurgeAudit()
 
         if desired != before:
@@ -122,9 +175,9 @@ class HarborPurgeAuditModule(HarborBaseModule):
         self.module.exit_json(**self.result)
 
 
-
 def main():
     HarborPurgeAuditModule()
+
 
 if __name__ == '__main__':
     main()

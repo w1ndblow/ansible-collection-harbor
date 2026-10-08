@@ -4,53 +4,78 @@
 # (c) 2021, Joshua Hügli <@joschi36>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-DOCUMENTATION = '''
+from __future__ import (absolute_import, division, print_function)
+__metaclass__ = type
+
+
+DOCUMENTATION = r'''
 ---
-module: harbor_scan_all_collection
+module: harbor_scan_all_schedule
 author:
   - Joshua Hügli (@joschi36)
-version_added: ""
-short_description: Manages Harbor scan all settings
+version_added: 0.1.0
+short_description: Manages Harbor scan all schedule settings
 description:
-  - Update Harbor scan all options over API.
-
+  - Update Harbor scan all schedule options over API.
+options:
+  schedule_cron:
+    description:
+    - Standard cron string.
+    type: str
+    required: true
+  state:
+    description:
+    - Desired state of the scan all schedule.
+    - Only V(present) is supported.
+    type: str
+    required: false
+    default: present
+    choices:
+    - present
 extends_documentation_fragment:
-  - swisstxt.harbor.api
+  - w1ndblow.harbor.api
+'''
+
+EXAMPLES = r'''
+- name: Configure Harbor scan all schedule
+  w1ndblow.harbor.harbor_scan_all_schedule:
+    api_url: https://localhost/api/v2.0
+    api_username: admin
+    api_password: Harbor12345
+    schedule_cron: "0 0 0 * * *"
 '''
 
 import copy
 import json
 
-import requests
 from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.swisstxt.harbor.plugins.module_utils.base import \
-    HarborBaseModule
+from ansible_collections.w1ndblow.harbor.plugins.module_utils.harbor_base import HarborBaseModule
 
 
 class HarborScanAllScheduleModule(HarborBaseModule):
     def getSchedule(self):
-        schedule_request = requests.get(
+        schedule_request = self.make_request(
             f'{self.api_url}/system/scanAll/schedule',
-            auth=self.auth
         )
-
-        if(schedule_request.status_code == 200 and schedule_request.headers['content-length'] == '0'):
+        if schedule_request['status'] == 200 and \
+                schedule_request['content-length'] == 0:
             return {}
 
-        schedule = schedule_request.json()
+        schedule = schedule_request['data']
         del schedule['schedule']['next_scheduled_time']
         return {
             'schedule': schedule['schedule']
         }
 
     def putSchedule(self, payload):
-        put_schedule_request = requests.put(
+        put_schedule_request = self.make_request(
             f'{self.api_url}/system/scanAll/schedule',
-            auth=self.auth,
-            json=payload
+            method='PUT',
+            data=payload
         )
-        if not put_schedule_request.status_code == 200:
-            self.module.fail_json(msg=self.requestParse(put_schedule_request))
+        if not put_schedule_request['status'] == 200:
+            self.module.fail_json(
+                msg=self.requestParse(put_schedule_request))
 
     def constructDesired(self, schedule_cron):
         return {
@@ -59,7 +84,6 @@ class HarborScanAllScheduleModule(HarborBaseModule):
                 'type': 'Custom'
             }
         }
-
 
     @property
     def argspec(self):
@@ -109,9 +133,9 @@ class HarborScanAllScheduleModule(HarborBaseModule):
         self.module.exit_json(**self.result)
 
 
-
 def main():
     HarborScanAllScheduleModule()
+
 
 if __name__ == '__main__':
     main()

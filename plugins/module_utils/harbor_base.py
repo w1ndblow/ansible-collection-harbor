@@ -1,9 +1,15 @@
-# import requests
-import json
-import base64
-from ansible.module_utils.urls import fetch_url
+# -*- coding: utf-8 -*-
 
-# __metaclass__ = type
+# (c) 2021, Joshua Hügli <@joschi36>
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+from __future__ import (absolute_import, division, print_function)
+__metaclass__ = type
+
+import base64
+import json
+
+from ansible.module_utils.urls import fetch_url
 
 
 class HarborBaseModule(object):
@@ -16,8 +22,8 @@ class HarborBaseModule(object):
     def __init__(self):
         self.api_url = self.module.params['api_url']
         self.auth = (
-                    self.module.params['api_username'],
-                    self.module.params['api_password']
+            self.module.params['api_username'],
+            self.module.params['api_password']
         )
         self.module.params['url_username'] = self.module.params['api_username']
         self.module.params['url_password'] = self.module.params['api_password']
@@ -36,18 +42,17 @@ class HarborBaseModule(object):
         encoded_str = base64.b64encode(
             pass_string.encode('utf-8')).decode('utf-8')
         headers = {
-            'Authorization': 'Basic {}'.format(
-                    encoded_str),
+            'Authorization': 'Basic {}'.format(encoded_str),
             'Content-Type': 'application/json',
         }
         try:
             resp, info = fetch_url(
-                        self.module,
-                        url=api_path,
-                        method=method,
-                        headers=headers,
-                        data=json.dumps(data)
-                            )
+                self.module,
+                url=api_path,
+                method=method,
+                headers=headers,
+                data=json.dumps(data)
+            )
             string_byte = resp.read()
             if string_byte:
                 response['data'] = json.loads(string_byte.decode('utf-8'))
@@ -92,10 +97,9 @@ class HarborBaseModule(object):
     def requestParse(self, request):
         try:
             if request['data']:
-                message = \
-                    f"HTTP status code: {request['status']}\n" \
-                    f"Message: {request['data'].get(
-                        'errors', [])[0].get('message', '')}"
+                message = 'HTTP status code: {0}\nMessage: {1}'.format(
+                    request['status'],
+                    request['data'].get('errors', [])[0].get('message', ''))
             else:
                 message = \
                     'Do not get message'

@@ -2,35 +2,61 @@
 # -*- coding: utf-8 -*-
 
 # (c) 2021, Joshua Hügli <@joschi36>
-# GNU General Public License v3.0+
-# (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-import copy
-import json
+from __future__ import (absolute_import, division, print_function)
+__metaclass__ = type
 
 
-from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.swisstxt.harbor.plugins.module_utils.harbor_base import HarborBaseModule
-
-DOCUMENTATION = '''
+DOCUMENTATION = r'''
 ---
-module: harbor_garbase_collection
+module: harbor_garbage_collection
 author:
+  - Aleksey Kuznetsov (@alekkuznetsov)
   - Joshua Hügli (@joschi36)
-version_added: ""
+version_added: 0.1.0
 short_description: Manages Harbor garbage collection settings
 description:
   - Update Harbor garbage collection options over API.
 options:
-    schedule_cron:
-        description:
-        - type str
-    delete_untagged:
-        description:
-        - type bool
+  schedule_cron:
+    description:
+    - Standard cron string.
+    type: str
+    required: true
+  delete_untagged:
+    description:
+    - Whether to delete untagged artifacts.
+    type: bool
+    required: true
+  state:
+    description:
+    - Desired state of the garbage collection settings.
+    - Only V(present) is supported.
+    type: str
+    required: false
+    default: present
+    choices:
+      - present
 extends_documentation_fragment:
-  - swisstxt.harbor.api
+  - w1ndblow.harbor.api
 '''
+
+EXAMPLES = r'''
+- name: Configure Harbor garbage collection
+  w1ndblow.harbor.harbor_garbage_collection:
+    api_url: https://localhost/api/v2.0
+    api_username: admin
+    api_password: Harbor12345
+    schedule_cron: "0 0 0 * * *"
+    delete_untagged: true
+'''
+
+import copy
+import json
+
+from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.w1ndblow.harbor.plugins.module_utils.harbor_base import HarborBaseModule
 
 
 class HarborGarbageCollectionModule(HarborBaseModule):
@@ -99,8 +125,9 @@ class HarborGarbageCollectionModule(HarborBaseModule):
             changed=False
         )
 
-        desired = self.constructDesired(self.module.params['delete_untagged'],
-                                        self.module.params['schedule_cron'])
+        desired = self.constructDesired(
+            self.module.params['delete_untagged'],
+            self.module.params['schedule_cron'])
         before = self.getGarbageCollection()
 
         if desired != before:

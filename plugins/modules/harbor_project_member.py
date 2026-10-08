@@ -2,26 +2,113 @@
 # -*- coding: utf-8 -*-
 
 # (c) 2021, Joshua Hügli <@joschi36>
-# GNU General Public License v3.0+ (see COPYING or \
-# https://www.gnu.org/licenses/gpl-3.0.txt)
-import copy
-from ansible.module_utils.basic import AnsibleModule
-from ansible_collections.swisstxt.harbor.plugins.module_utils.harbor_base import HarborBaseModule
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-DOCUMENTATION = '''
+from __future__ import (absolute_import, division, print_function)
+__metaclass__ = type
+
+
+DOCUMENTATION = r'''
 ---
 module: harbor_project_member
 author:
+  - Kuznetsov Aleksey (@alekkuznetsov)
   - Joshua Hügli (@joschi36)
-version_added: ""
+version_added: 0.1.0
 short_description: Manage Harbor project members
 description:
   - Create, update and delete Harbor project members over API.
 options:
-  #TODO
+  project:
+    type: str
+    required: true
+    description:
+    - Project name.
+  user:
+    type: str
+    required: false
+    description:
+    - User name.
+  group:
+    type: str
+    required: false
+    description:
+    - Group name.
+  group_type:
+    type: str
+    description:
+    - Group type name.
+    required: false
+    choices:
+    - ldap
+    - http
+    - oidc
+  ldap_group_dn:
+    type: str
+    required: false
+    description:
+    - LDAP group distinguished name. Required when O(group_type=ldap).
+  role:
+    type: str
+    description:
+    - Role name.
+    required: false
+    choices:
+    - projectAdmin
+    - maintainer
+    - developer
+    - guest
+    - limitedGuest
+  state:
+    type: str
+    required: false
+    description:
+    - Whether the member should be (V(present)) or should not be
+      (V(absent)) in the project.
+    default: present
+    choices:
+    - present
+    - absent
 extends_documentation_fragment:
-  - swisstxt.harbor.api
+  - w1ndblow.harbor.api
 '''
+
+EXAMPLES = r'''
+- name: Add user to project as maintainer
+  w1ndblow.harbor.harbor_project_member:
+    api_url: https://localhost/api/v2.0
+    api_username: admin
+    api_password: Harbor12345
+    project: hello
+    user: devops
+    role: maintainer
+
+- name: Add LDAP group to project as developer
+  w1ndblow.harbor.harbor_project_member:
+    api_url: https://localhost/api/v2.0
+    api_username: admin
+    api_password: Harbor12345
+    project: hello
+    group: developers
+    group_type: ldap
+    ldap_group_dn: CN=developers,OU=groups,DC=example,DC=com
+    role: developer
+
+- name: Remove user from project
+  w1ndblow.harbor.harbor_project_member:
+    api_url: https://localhost/api/v2.0
+    api_username: admin
+    api_password: Harbor12345
+    project: hello
+    user: devops
+    role: maintainer
+    state: absent
+'''
+
+import copy
+
+from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.w1ndblow.harbor.plugins.module_utils.harbor_base import HarborBaseModule
 
 
 class HarborProjectMemberModule(HarborBaseModule):
@@ -123,7 +210,7 @@ class HarborProjectMemberModule(HarborBaseModule):
                 ('user', 'group')
             ],
             required_if=[
-                ('group_type', 'ldap', ('ldap_group_dn'))
+                ('group_type', 'ldap', ['ldap_group_dn'])
             ],
             required_by={
                 'user': ('role'),
@@ -235,7 +322,7 @@ class HarborProjectMemberModule(HarborBaseModule):
 
             self.result['changed'] = True
 
-        # Inexistent member, state absent, no action (just for refrence)
+        # Inexistent member, state absent, no action (just for reference)
         else:
             pass
 

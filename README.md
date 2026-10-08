@@ -1,5 +1,6 @@
 # Harbor Collection
-contain modules for config harbor instance
+
+Contain modules for config harbor instance
 
 ## Tested with Ansible
 
@@ -7,28 +8,29 @@ contain modules for config harbor instance
 
 ## External requirements
 
-
-
 ### Supported connections
+
 all
 
 ## Included content
 
 * harbor_config
-* harbor_garbase_collection
+* harbor_garbage_collection
 * harbor_project_member
 * harbor_project
+* harbor_purgeaudit
 * harbor_registry
+* harbor_scan_all_schedule
 
 ## Using this collection
 
+`ansible-galaxy collection install w1ndblow.harbor --upgrade`
 
+or from GitHub
 
-`ansible-galaxy  collection install  git+https://github.com/w1ndblow/ansible-collection-harbor.git,refactor --upgrade`
+`ansible-galaxy collection install git+https://github.com/w1ndblow/ansible-collection-harbor.git --upgrade`
 
-
-
-in role
+Use role
 
 ```yaml
 ---
@@ -36,7 +38,7 @@ in role
   hosts: localhost
   tasks:
     - name: Create project
-      swisstxt.harbor.harbor_project:
+      w1ndblow.harbor.harbor_project:
         api_password: Harbor12345
         api_url: http://localhost:8080/api/v2.0
         api_username: admin
@@ -45,20 +47,21 @@ in role
 
 ```
 
+For more information use:
 
+`ansible-doc -t module w1ndblow.harbor.<module name>`
+
+example
+
+`ansible-doc -t module w1ndblow.harbor.harbor_project_member`
 
 ## Contributing to this collection
 
-
-
-
 ## Release notes
-
-
 
 ## Roadmap
 
-* add labels to repository 
+* add labels to repository
 
 ## More information
 

@@ -2,28 +2,81 @@
 # -*- coding: utf-8 -*-
 
 # (c) 2021, Joshua Hügli <@joschi36>
-# GNU General Public License v3.0+ (see COPYING or \
-# https://www.gnu.org/licenses/gpl-3.0.txt)
-import copy
-import json
-from ansible_collections.swisstxt.harbor.plugins.module_utils.harbor_base import HarborBaseModule
-from ansible.module_utils.basic import AnsibleModule
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+from __future__ import (absolute_import, division, print_function)
+__metaclass__ = type
 
 
-DOCUMENTATION = '''
+DOCUMENTATION = r'''
 ---
-self.module: harbor_project
+module: harbor_project
 author:
+  - Kuznetsov Aleksey (@alekkuznetsov)
   - Joshua Hügli (@joschi36)
-version_added: ""
+version_added: 0.1.0
 short_description: Manage Harbor project
 description:
   - Create, update and delete Harbor Configuration over API.
 options:
-  #TODO
+  name:
+    description: Name of the project.
+    type: str
+    required: true
+  public:
+    description: Whether the project is public.
+    type: bool
+    required: false
+  auto_scan:
+    description: Whether images are automatically scanned after push.
+    type: bool
+    required: false
+  content_trust:
+    description: Whether content trust is enabled.
+    type: bool
+    required: false
+  quota_gb:
+    description: Storage quota of the project in GiB. Use -1 for unlimited.
+    type: int
+    required: false
+  cache_registry:
+    description: Name of the remote registry to cache in the project.
+    type: str
+    required: false
+  state:
+    description: Create (V(present)) or delete (V(absent)) the project.
+    type: str
+    default: present
+    choices:
+      - present
+      - absent
 extends_documentation_fragment:
-  - swisstxt.harbor.api
+  - w1ndblow.harbor.api
 '''
+
+EXAMPLES = r'''
+- name: Create project
+  w1ndblow.harbor.harbor_project:
+    api_url: https://localhost/api/v2.0
+    api_username: admin
+    api_password: Harbor12345
+    name: hello
+    state: present
+
+- name: Delete project
+  w1ndblow.harbor.harbor_project:
+    api_url: https://localhost/api/v2.0
+    api_username: admin
+    api_password: Harbor12345
+    name: hello
+    state: absent
+'''
+
+import copy
+import json
+
+from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.w1ndblow.harbor.plugins.module_utils.harbor_base import HarborBaseModule
 
 
 class HarborProjectModule(HarborBaseModule):
@@ -32,18 +85,12 @@ class HarborProjectModule(HarborBaseModule):
         argument_spec = copy.deepcopy(self.COMMON_ARG_SPEC)
         argument_spec.update(
             name=dict(type='str', required=True),
-
             public=dict(type='bool', required=False),
             auto_scan=dict(type='bool', required=False),
             content_trust=dict(type='bool', required=False),
-
             quota_gb=dict(type='int', required=False),
-
             cache_registry=dict(type='str', required=False),
-
-            state=dict(default='present', choices=[
-                'present',
-                'absent'])
+            state=dict(default='present', choices=['present', 'absent'])
         )
         return argument_spec
 
@@ -65,15 +112,15 @@ class HarborProjectModule(HarborBaseModule):
         if existing_project and module_state == 'absent' and not \
                 self.module.check_mode:
             del_request = self.make_request(
-                    f'{self.api_url}/projects'
-                    f'/{existing_project["project_id"]}',
-                    method='DELETE')
+                f'{self.api_url}/projects'
+                f'/{existing_project["project_id"]}',
+                method='DELETE')
             if del_request['status'] == 200:
                 self.result['changed'] = True
                 self.module.exit_json(**self.result)
             else:
-                self.module.fail_json(msg=self.requestParse(
-                        del_request))
+                self.module.fail_json(
+                    msg=self.requestParse(del_request))
 
         project_desired_metadata = {}
         if self.module.params['auto_scan'] is not None:
@@ -90,14 +137,14 @@ class HarborProjectModule(HarborBaseModule):
             # Handle Quota
             if self.module.params['quota_gb'] is not None:
                 quota_request = self.make_request(
-                    f'{self.api_url}/quotas?reference_id'
-                    f"={existing_project['project_id']}",
+                    f'{self.api_url}/quotas?reference_id='
+                    f"{existing_project['project_id']}",
                     method='GET',
                 )
                 quota = quota_request['data'][0]
                 actual_quota_size = quota['hard']['storage']
                 desired_quota_size = self.quotaBits(
-                            self.module.params['quota_gb'])
+                    self.module.params['quota_gb'])
                 if actual_quota_size != desired_quota_size:
                     quota_put_request = self.make_request(
                         f"{self.api_url}/quotas/{quota['id']}",
@@ -105,7 +152,7 @@ class HarborProjectModule(HarborBaseModule):
                         data=json.dumps({
                             'hard': {
                                 'storage': desired_quota_size
-                             }}),
+                            }}),
                     )
                     if quota_put_request['status'] == 200:
                         self.result['changed'] = True
@@ -183,19 +230,19 @@ class HarborProjectModule(HarborBaseModule):
                         self.module.params['quota_gb'])
 
                 if self.module.params['cache_registry'] is not None:
+                    cache_registry = self.module.params['cache_registry']
                     registry_request = self.make_request(
-                        f'{self.api_url}/registries'
-                        f'?q=name%3D{self.module.params['cache_registry']}',
+                        f'{self.api_url}/registries?q=name%3D{cache_registry}',
                     )
                     try:
-                        data['registry_id'] = registry_request[0]['id']
-                    except (TypeError, ValueError):
+                        data['registry_id'] = registry_request['data'][0]['id']
+                    except (IndexError, KeyError, TypeError):
                         self.module.fail_json(
                             msg='Registry not found',
                             **self.result)
 
                 create_project_request = self.make_request(
-                    self.api_url+'/projects',
+                    self.api_url + '/projects',
                     method='POST',
                     data=data
                 )
@@ -203,9 +250,10 @@ class HarborProjectModule(HarborBaseModule):
                     self.module.fail_json(msg=self.requestParse(
                         create_project_request))
 
+                project_name = self.module.params['name']
                 after_request = self.make_request(
                     f'{self.api_url}/projects?page=1'
-                    f'&page_size=1&name={self.module.params['name']}'
+                    f'&page_size=1&name={project_name}',
                 )
                 self.result['project'] = copy.deepcopy(after_request)
             self.result['changed'] = True

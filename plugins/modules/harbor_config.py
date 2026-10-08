@@ -1,31 +1,73 @@
-#import sys; sys.path.append('../..')
-import copy
-from ansible_collections.swisstxt.harbor.plugins.module_utils.harbor_base import HarborBaseModule
-import json
-from ansible.module_utils.basic import AnsibleModule
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 
-DOCUMENTATION = '''
+# (c) 2021, Joshua Hügli <@joschi36>
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+from __future__ import (absolute_import, division, print_function)
+__metaclass__ = type
+
+
+DOCUMENTATION = r'''
 ---
 module: harbor_config
 author:
+  - Aleksey Kuznetsov (@alekkuznetsov)
   - Joshua Hügli (@joschi36)
-version_added: ""
+version_added: 0.1.0
 short_description: Manage Harbor configuration
 description:
   - Update Harbor Configuration over API.
-  - Can be run wihout `configuration` to get current config.
+  - Can be run without O(configuration) to get current config.
 options:
   configuration:
     description:
     - Dict with configuration options of Harbor.
-    - Changes to secrets, like `oidc_client_secret`, get applied without \
-        showing a change as we do not know what the value before was.
+    - Changes to secrets, like C(oidc_client_secret), get applied without
+      showing a change as we do not know what the value before was.
     required: false
     type: dict
-    default: {}
+  force:
+    description:
+    - Apply the configuration even if no change was detected.
+    required: false
+    type: bool
+    default: false
+  state:
+    description:
+    - Desired state of the configuration.
+    - Only V(present) is supported.
+    required: false
+    type: str
+    default: present
+    choices:
+      - present
 extends_documentation_fragment:
-  - swisstxt.harbor.api
+  - w1ndblow.harbor.api
 '''
+
+EXAMPLES = r'''
+- name: Update Harbor configuration
+  w1ndblow.harbor.harbor_config:
+    api_url: https://localhost/api/v2.0
+    api_username: admin
+    api_password: Harbor12345
+    configuration:
+      auth_mode: db_auth
+      project_creation_restriction: everyone
+
+- name: Get current Harbor configuration
+  w1ndblow.harbor.harbor_config:
+    api_url: https://localhost/api/v2.0
+    api_username: admin
+    api_password: Harbor12345
+'''
+
+import copy
+import json
+
+from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.w1ndblow.harbor.plugins.module_utils.harbor_base import HarborBaseModule
 
 
 class HarborConfigModule(HarborBaseModule):
@@ -53,7 +95,7 @@ class HarborConfigModule(HarborBaseModule):
 
         # Get existing configuration
         before_request = self.make_request(
-            self.api_url+'/configurations',
+            self.api_url + '/configurations',
         )
         before = before_request['data']
         result['configuration'] = before.copy()
@@ -82,7 +124,7 @@ class HarborConfigModule(HarborBaseModule):
                         self.module.fail_json(
                             msg=f'Configuration option'
                                 f'{configuration} not editable.',
-                                **result)
+                            **result)
 
                     # Create fake server response for diff
                     after_calculated.update({
@@ -109,7 +151,7 @@ class HarborConfigModule(HarborBaseModule):
             # Apply change without checkmode
             else:
                 set_request = self.make_request(
-                    self.api_url+'/configurations',
+                    self.api_url + '/configurations',
                     method='PUT',
                     data=desired_configuration,
                 )
@@ -130,10 +172,10 @@ class HarborConfigModule(HarborBaseModule):
                         msg=f"""
                         Unknown HTTP status code: {set_request['status']}
                         Body: {set_request['data']}
-                    """)
+                        """)
 
                 after_request = self.make_request(
-                    self.api_url+'/configurations',
+                    self.api_url + '/configurations',
                 )
                 after = after_request['data']
                 result['configuration'] = after.copy()
