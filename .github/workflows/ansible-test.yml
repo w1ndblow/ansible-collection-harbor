@@ -15,6 +15,7 @@ on:
       - pt-main
     tags:
       - 'v*'
+      - '[0-9]*'
   pull_request:
   schedule:
     - cron: '0 6 * * *'
@@ -99,12 +100,13 @@ jobs:
   ###
   # Release the collection to galaxy.ansible.com
   #
-  # Triggered by pushing a tag that matches the collection version (v0.3.0).
+  # Triggered by pushing a tag that matches the collection version
+  # (v1.0.0 or 1.0.0).
   # Requires the GALAXY_API_KEY secret to be set in the repository.
 
   release:
     name: Release to Galaxy
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/')
     needs:
       - sanity
       - build
@@ -124,8 +126,9 @@ jobs:
       - name: Verify tag matches collection version
         run: |
           VERSION="$(python -c "import yaml; print(yaml.safe_load(open('galaxy.yml'))['version'])")"
-          if [ "v${VERSION}" != "${GITHUB_REF_NAME}" ]; then
-            echo "::error::Tag ${GITHUB_REF_NAME} does not match collection version v${VERSION} in galaxy.yml"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "${VERSION}" != "${TAG_VERSION}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match collection version ${VERSION} in galaxy.yml"
             exit 1
           fi
           echo "COLLECTION_VERSION=${VERSION}" >> "$GITHUB_ENV"
