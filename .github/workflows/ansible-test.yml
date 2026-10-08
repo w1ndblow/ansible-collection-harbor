@@ -1,0 +1,137 @@
+# CI pipeline for the w1ndblow.harbor collection.
+#
+# - sanity: runs ansible-test sanity against supported ansible-core versions
+# - release: builds and publishes the collection to galaxy.ansible.com on tags
+#
+# Publishing requires the GALAXY_API_KEY secret to be configured in the
+# repository (https://galaxy.ansible.com/me/preferences → API Key).
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - pt-main
+    tags:
+      - 'v*'
+  pull_request:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+env:
+  NAMESPACE: w1ndblow
+  COLLECTION_NAME: harbor
+
+jobs:
+
+  ###
+  # Sanity tests
+  #
+  # https://docs.ansible.com/ansible/latest/dev_guide/testing_sanity.html
+
+  sanity:
+    name: Sanity (Ⓐ${{ matrix.ansible }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ansible:
+          - stable-2.16
+          - stable-2.17
+          - devel
+    steps:
+
+      # ansible-test requires the collection to be in a directory in the form
+      # .../ansible_collections/${{env.NAMESPACE}}/${{env.COLLECTION_NAME}}/
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          path: ansible_collections/${{ env.NAMESPACE }}/${{ env.COLLECTION_NAME }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          # it is just required to run that once as "ansible-test sanity" in the docker image
+          # will run on all python versions it supports.
+          python-version: '3.11'
+
+      - name: Install ansible-core (${{ matrix.ansible }})
+        run: pip install https://github.com/ansible/ansible/archive/${{ matrix.ansible }}.tar.gz --disable-pip-version-check
+
+      # run ansible-test sanity inside of Docker.
+      # The docker container has all the pinned dependencies that are required
+      # and all python versions ansible supports.
+      - name: Run sanity tests
+        run: ansible-test sanity --docker -v --color
+        working-directory: ./ansible_collections/${{ env.NAMESPACE }}/${{ env.COLLECTION_NAME }}
+
+  ###
+  # Build the collection artifact on every change to catch packaging problems
+  # early (only on non-tag pushes and PRs this job stops after the build).
+
+  build:
+    name: Build collection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ansible-core
+        run: pip install ansible-core --disable-pip-version-check
+
+      - name: Build collection artifact
+        run: ansible-galaxy collection build --force --output-path dist/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: collection-artifact
+          path: dist/*.tar.gz
+
+  ###
+  # Release the collection to galaxy.ansible.com
+  #
+  # Triggered by pushing a tag that matches the collection version (v0.3.0).
+  # Requires the GALAXY_API_KEY secret to be set in the repository.
+
+  release:
+    name: Release to Galaxy
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - sanity
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ansible-core
+        run: pip install ansible-core --disable-pip-version-check
+
+      - name: Verify tag matches collection version
+        run: |
+          VERSION="$(python -c "import yaml; print(yaml.safe_load(open('galaxy.yml'))['version'])")"
+          if [ "v${VERSION}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match collection version v${VERSION} in galaxy.yml"
+            exit 1
+          fi
+          echo "COLLECTION_VERSION=${VERSION}" >> "$GITHUB_ENV"
+
+      - name: Build collection
+        run: ansible-galaxy collection build --force --output-path dist/
+
+      - name: Publish collection to galaxy.ansible.com
+        run: ansible-galaxy collection publish dist/${{ env.NAMESPACE }}-${{ env.COLLECTION_NAME }}-${{ env.COLLECTION_VERSION }}.tar.gz --api-key "${{ secrets.GALAXY_API_KEY }}"

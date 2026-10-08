@@ -1,0 +1,14 @@
+{
+  "creation_time": "2024-10-08T17:50:50.150Z",
+  "id": 3,
+  "job_kind": "0 0 0 * * *",
+  "job_parameters": "{\"delete_untagged\":false,\"workers\":0}",
+  "job_status": "Running",
+  "schedule": {
+    "cron": "0 0 0 * * *",
+    "next_scheduled_time": "2024-10-09T00:00:00.000Z",
+    "type": "Custom"
+  },
+  "update_time": "2024-10-08T17:50:50.150Z"
+}
+

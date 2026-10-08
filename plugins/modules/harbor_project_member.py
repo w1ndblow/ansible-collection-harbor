@@ -1,0 +1,337 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# (c) 2021, Joshua Hügli <@joschi36>
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+from __future__ import (absolute_import, division, print_function)
+__metaclass__ = type
+
+
+DOCUMENTATION = r'''
+---
+module: harbor_project_member
+author:
+  - Kuznetsov Aleksey (@alekkuznetsov)
+  - Joshua Hügli (@joschi36)
+version_added: 0.1.0
+short_description: Manage Harbor project members
+description:
+  - Create, update and delete Harbor project members over API.
+options:
+  project:
+    type: str
+    required: true
+    description:
+    - Project name.
+  user:
+    type: str
+    required: false
+    description:
+    - User name.
+  group:
+    type: str
+    required: false
+    description:
+    - Group name.
+  group_type:
+    type: str
+    description:
+    - Group type name.
+    required: false
+    choices:
+    - ldap
+    - http
+    - oidc
+  ldap_group_dn:
+    type: str
+    required: false
+    description:
+    - LDAP group distinguished name. Required when O(group_type=ldap).
+  role:
+    type: str
+    description:
+    - Role name.
+    required: false
+    choices:
+    - projectAdmin
+    - maintainer
+    - developer
+    - guest
+    - limitedGuest
+  state:
+    type: str
+    required: false
+    description:
+    - Whether the member should be (V(present)) or should not be
+      (V(absent)) in the project.
+    default: present
+    choices:
+    - present
+    - absent
+extends_documentation_fragment:
+  - w1ndblow.harbor.api
+'''
+
+EXAMPLES = r'''
+- name: Add user to project as maintainer
+  w1ndblow.harbor.harbor_project_member:
+    api_url: https://localhost/api/v2.0
+    api_username: admin
+    api_password: Harbor12345
+    project: hello
+    user: devops
+    role: maintainer
+
+- name: Add LDAP group to project as developer
+  w1ndblow.harbor.harbor_project_member:
+    api_url: https://localhost/api/v2.0
+    api_username: admin
+    api_password: Harbor12345
+    project: hello
+    group: developers
+    group_type: ldap
+    ldap_group_dn: CN=developers,OU=groups,DC=example,DC=com
+    role: developer
+
+- name: Remove user from project
+  w1ndblow.harbor.harbor_project_member:
+    api_url: https://localhost/api/v2.0
+    api_username: admin
+    api_password: Harbor12345
+    project: hello
+    user: devops
+    role: maintainer
+    state: absent
+'''
+
+import copy
+
+from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.w1ndblow.harbor.plugins.module_utils.harbor_base import HarborBaseModule
+
+
+class HarborProjectMemberModule(HarborBaseModule):
+    ROLES = {
+        'projectAdmin': 1,
+        'developer': 2,
+        'guest': 3,
+        'maintainer': 4,
+        'limitedGuest': 5
+    }
+
+    @property
+    def group_type_id(self):
+        group_type = self.module.params['group_type']
+        groups = {
+            'ldap': 1,
+            'http': 2,
+            'oidc': 3
+        }
+        return groups.get(group_type)
+
+    @property
+    def role_id(self):
+        role = self.module.params['role']
+        roles = self.ROLES
+        return roles.get(role)
+
+    @property
+    def isUser(self):
+        return self.module.params['user'] is not None
+
+    @property
+    def isGroup(self):
+        return self.module.params['group'] is not None
+
+    def getMemberType(self):
+        if self.isUser:
+            return 'u'
+        elif self.isGroup:
+            return 'g'
+
+    def getMemberName(self):
+        if self.isUser:
+            return self.module.params['user']
+        elif self.isGroup:
+            return self.module.params['group']
+
+    def listProjectMembers(self, project_id):
+        member_list_request = self.make_request(
+            f'{self.api_url}/projects/{project_id}/members',
+        )
+        member_list = member_list_request['data']
+        self.result['member_list'] = member_list
+        return member_list
+
+    def getMember(self, project_id, member_name, member_type):
+        member_list = self.listProjectMembers(project_id)
+        for member in member_list:
+            if member['entity_type'] == member_type and member['entity_name'] \
+                    == member_name:
+                self.result['member'] = copy.deepcopy(member)
+                return member
+
+        return None
+
+    @property
+    def argspec(self):
+        argument_spec = copy.deepcopy(self.COMMON_ARG_SPEC)
+        argument_spec.update(
+            project=dict(type='str', required=True),
+            user=dict(type='str', required=False),
+            group=dict(type='str', required=False),
+            group_type=dict(
+                type='str',
+                required=False,
+                choices=['ldap', 'http', 'oidc']
+            ),
+            ldap_group_dn=dict(type='str', required=False),
+            role=dict(
+                type='str',
+                required=False,
+                choices=[
+                    'projectAdmin',
+                    'maintainer',
+                    'developer',
+                    'guest',
+                    'limitedGuest']
+            ),
+
+            state=dict(default='present', choices=['present', 'absent'])
+        )
+        return argument_spec
+
+    def __init__(self):
+        self.module = AnsibleModule(
+            argument_spec=self.argspec,
+            supports_check_mode=True,
+            mutually_exclusive=[
+                ('user', 'group')
+            ],
+            required_if=[
+                ('group_type', 'ldap', ['ldap_group_dn'])
+            ],
+            required_by={
+                'user': ('role'),
+                'group': ('role', ('group_type'))
+            }
+        )
+
+        super().__init__()
+
+        self.result = dict(
+            changed=False
+        )
+
+        # Get Project ID
+        project = self.getProjectByName(self.module.params['project'])
+        if not project:
+            self.module.fail_json(msg='Project not found', **self.result)
+        project_id = project['project_id']
+
+        # If no user and group is given, exit with project member list
+        if not self.isUser and not self.isGroup:
+            self.listProjectMembers(project_id)
+            self.module.exit_json(**self.result)
+
+        member_type = self.getMemberType()
+        member_name = self.getMemberName()
+        member = self.getMember(
+            project_id,
+            member_name,
+            member_type,
+        )
+        state = self.module.params['state']
+
+        # Existing member, state present, modify
+        if member and state == 'present':
+            if member['role_id'] != self.role_id:
+                if not self.module.check_mode:
+                    put_project_member_request = self.make_request(
+                        f"{self.api_url}/projects/{project_id}"
+                        f"/members/{member['id']}",
+                        method='PUT',
+                        data={
+                            'role_id': self.role_id
+                        }
+                    )
+                    if not put_project_member_request['status'] == 200:
+                        self.module.fail_json(msg=self.requestParse(
+                            put_project_member_request))
+
+                    # Execute getMember to set results
+                    self.getMember(
+                        project_id,
+                        member_name,
+                        member_type,
+                    )
+
+                self.result['changed'] = True
+
+        # Existing member, state absent, delete
+        elif member and state == 'absent':
+            if not self.module.check_mode:
+                delete_project_member_request = self.make_request(
+                    f"{self.api_url}/projects/{project_id}"
+                    f"/members/{member['id']}",
+                    method='DELETE'
+                )
+                if not delete_project_member_request['status'] == 200:
+                    self.module.fail_json(
+                        msg=self.requestParse(delete_project_member_request))
+
+            self.result['changed'] = True
+
+        # Inexistent member, state present, create
+        elif not member and state == 'present':
+            create_payload = {
+                'role_id': self.role_id,
+            }
+
+            if self.isGroup:
+                create_payload['member_group'] = {
+                    'group_name': self.module.params['group'],
+                    'group_type': self.group_type_id,
+                }
+                if self.module.params['ldap_group_dn'] is not None:
+                    create_payload['member_group']['ldap_group_dn'] = \
+                        self.module.params['ldap_group_dn']
+
+            if self.isUser:
+                create_payload['member_user'] = {
+                    'username': self.module.params['user'],
+                }
+            if not self.module.check_mode:
+                create_project_member_request = self.make_request(
+                    f'{self.api_url}/projects/{project_id}/members',
+                    method='POST',
+                    data=create_payload
+                )
+
+                if not create_project_member_request['status'] == 201:
+                    self.module.fail_json(msg=self.requestParse(
+                        create_project_member_request))
+
+                # Execute getMember to set results
+                self.getMember(
+                    project_id,
+                    member_name,
+                    member_type,
+                )
+
+            self.result['changed'] = True
+
+        # Inexistent member, state absent, no action (just for reference)
+        else:
+            pass
+
+        self.module.exit_json(**self.result)
+
+
+def main():
+    HarborProjectMemberModule()
+
+
+if __name__ == '__main__':
+    main()

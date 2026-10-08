@@ -1,0 +1,25 @@
+# See https://docs.ansible.com/ansible/latest/dev_guide/collections_galaxy_meta.html
+
+namespace: w1ndblow
+name: harbor
+version: 0.3.0
+readme: README.md
+authors:
+  - Alekey Kuznetsov (github.com/w1ndblow)
+  - Joshua Hügli (github.com/joschi36)
+description: A collection of modules to manage Harbor over API
+license_file: LICENSE
+tags:
+  - harbor
+  - docker
+  - registry
+repository: https://github.com/w1ndblow/ansible-collection-harbor
+#documentation: https://github.com/ansible-collection-migration/community.REPO_NAME/tree/main/docs
+homepage: https://github.com/w1ndblow/ansible-collection-harbor
+issues: https://github.com/w1ndblow/ansible-collection-harbor/issues
+build_ignore:
+# https://docs.ansible.com/ansible/devel/dev_guide/developing_collections.html#ignoring-files-and-folders
+  - .gitignore
+  - .github
+  - changelogs/.plugin-cache.yaml
+  - dist

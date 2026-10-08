@@ -1,0 +1,197 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# (c) 2021, Joshua Hügli <@joschi36>
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+from __future__ import (absolute_import, division, print_function)
+__metaclass__ = type
+
+
+DOCUMENTATION = r'''
+---
+module: harbor_config
+author:
+  - Aleksey Kuznetsov (@alekkuznetsov)
+  - Joshua Hügli (@joschi36)
+version_added: 0.1.0
+short_description: Manage Harbor configuration
+description:
+  - Update Harbor Configuration over API.
+  - Can be run without O(configuration) to get current config.
+options:
+  configuration:
+    description:
+    - Dict with configuration options of Harbor.
+    - Changes to secrets, like C(oidc_client_secret), get applied without
+      showing a change as we do not know what the value before was.
+    required: false
+    type: dict
+  force:
+    description:
+    - Apply the configuration even if no change was detected.
+    required: false
+    type: bool
+    default: false
+  state:
+    description:
+    - Desired state of the configuration.
+    - Only V(present) is supported.
+    required: false
+    type: str
+    default: present
+    choices:
+      - present
+extends_documentation_fragment:
+  - w1ndblow.harbor.api
+'''
+
+EXAMPLES = r'''
+- name: Update Harbor configuration
+  w1ndblow.harbor.harbor_config:
+    api_url: https://localhost/api/v2.0
+    api_username: admin
+    api_password: Harbor12345
+    configuration:
+      auth_mode: db_auth
+      project_creation_restriction: everyone
+
+- name: Get current Harbor configuration
+  w1ndblow.harbor.harbor_config:
+    api_url: https://localhost/api/v2.0
+    api_username: admin
+    api_password: Harbor12345
+'''
+
+import copy
+import json
+
+from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.w1ndblow.harbor.plugins.module_utils.harbor_base import HarborBaseModule
+
+
+class HarborConfigModule(HarborBaseModule):
+    @property
+    def argspec(self):
+        argument_spec = copy.deepcopy(self.COMMON_ARG_SPEC)
+        argument_spec.update(
+            configuration=dict(type='dict', required=False),
+            force=dict(type='bool', required=False, default=False),
+            state=dict(default='present', choices=['present'])
+        )
+        return argument_spec
+
+    def __init__(self):
+        self.module = AnsibleModule(
+            argument_spec=self.argspec,
+            supports_check_mode=True
+        )
+
+        super().__init__()
+
+        result = dict(
+            changed=False
+        )
+
+        # Get existing configuration
+        before_request = self.make_request(
+            self.api_url + '/configurations',
+        )
+        before = before_request['data']
+        result['configuration'] = before.copy()
+
+        # Check & "calculate" desired configuration
+        desired_configuration = self.module.params['configuration']
+        if desired_configuration:
+            after_calculated = before.copy()
+            for configuration in list(desired_configuration):
+                if not configuration == 'oidc_client_secret':
+                    # Check if configuration option is available
+                    if configuration not in before:
+                        self.module.fail_json(
+                            msg=f'Configuration option {configuration}'
+                                f' unavailable.',
+                            **result)
+
+                    # Remove not changed configurations
+                    if desired_configuration[configuration] == \
+                            before[configuration].get('value', ''):
+                        desired_configuration.pop(configuration)
+                        continue
+
+                    # Check if configuration is editable
+                    if not before[configuration]['editable']:
+                        self.module.fail_json(
+                            msg=f'Configuration option'
+                                f'{configuration} not editable.',
+                            **result)
+
+                    # Create fake server response for diff
+                    after_calculated.update({
+                        configuration: {
+                            'value': desired_configuration[configuration],
+                            'editable': before[configuration]['editable']
+                        }
+                    })
+
+            result['desired_configuration'] = desired_configuration
+            if (not self.module.params['force']) and before == \
+                    after_calculated:
+                result['changed'] = False
+                self.module.exit_json(**result)
+
+            # Test change with checkmode
+            if self.module.check_mode:
+                result['changed'] = True
+                result['diff'] = {
+                    'before': json.dumps(before, indent=4),
+                    'after': json.dumps(after_calculated, indent=4),
+                }
+
+            # Apply change without checkmode
+            else:
+                set_request = self.make_request(
+                    self.api_url + '/configurations',
+                    method='PUT',
+                    data=desired_configuration,
+                )
+                if set_request['status'] == 200:
+                    pass
+                elif set_request['status'] == 401:
+                    self.module.fail_json(
+                        msg='User need to log in first.', **result)
+                elif set_request['status'] == 403:
+                    self.module.fail_json(
+                        msg='User does not have permission of admin role.',
+                        **result)
+                elif set_request['status'] == 500:
+                    self.module.fail_json(
+                        msg='Unexpected internal errors.', **result)
+                else:
+                    self.module.fail_json(
+                        msg=f"""
+                        Unknown HTTP status code: {set_request['status']}
+                        Body: {set_request['data']}
+                        """)
+
+                after_request = self.make_request(
+                    self.api_url + '/configurations',
+                )
+                after = after_request['data']
+                result['configuration'] = after.copy()
+                if before != after:
+                    result['changed'] = True
+                    result['diff'] = {
+                        'before': json.dumps(before, indent=4),
+                        'after': json.dumps(after, indent=4),
+                    }
+
+        self.module.exit_json(**result)
+
+
+def main():
+    HarborConfigModule()
+
+
+if __name__ == '__main__':
+    main()
