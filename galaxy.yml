@@ -2,7 +2,7 @@
 
 namespace: w1ndblow
 name: harbor
-version: 0.3.0
+version: 1.0.0
 readme: README.md
 authors:
   - Alekey Kuznetsov (github.com/w1ndblow)
